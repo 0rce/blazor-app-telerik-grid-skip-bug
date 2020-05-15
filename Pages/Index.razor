@@ -1,0 +1,127 @@
+@page "/"
+
+@inject IHttpClientFactory HttpClientFactory
+
+<p>
+    <h4>Steps to reproduce skip bug</h4>
+    <ul>
+        <li>Click <b>1. Search</b>, grid data is filtered to a total of 31 items</li>
+        <li>Click <b>2. Clear search and set grid skip 32</b>, filter is removed and <span class="text-danger">grid skips 32 items but sets skip to 21 immentiatlly afterwards (see Last Skip indication below) -> bug?</span></li>
+        <li>Click <b>2. Clear search and set grid skip 32</b> again, sets the skip value correctly</li>
+    </ul>
+</p>
+
+<p>
+    <span class="text-danger">Last Skip <b>@LastSkip</b></span>,
+    Current grid item count <b>@Items?.Count</b>,
+    Current grid item total count <b>@TotalCount</b>
+</p>
+
+<p>
+    <TelerikButton OnClick="@SearchClicked">1. Search</TelerikButton>
+</p>
+
+<p>
+    <TelerikButton OnClick="@ResetSearchValueAndSetGridSkip32">2. Clear search and set grid skip 32</TelerikButton>
+</p>
+
+<p>
+    <TelerikGrid Data=@Items Height="@string.Format("{0}px", GridHeightPx)" FilterMode="GridFilterMode.None" ScrollMode="@GridScrollMode.Virtual"
+                    Sortable="false" RowHeight="@GridRowHeight" PageSize=@PageSize OnRead=@ReadGridItems TotalCount=@TotalCount Groupable="false" Resizable="true"
+                    @ref="@Grid"
+                    Class="grid">
+        <GridColumns>
+            <GridColumn Field="@(nameof(Row.Ordnungszahl))" Title="Ordnungszahl" Width="150px" />
+            <GridColumn Field="@(nameof(Row.Kurztext))" Title="Kurztext" />
+        </GridColumns>
+    </TelerikGrid>
+</p>
+
+@code {
+
+    // grid
+    TelerikGrid<Row> Grid;
+    List<Row> Items { get; set; }
+    int TotalCount { get; set; }
+    int PageSize { get; set; } = 10;
+    const int GridRowHeight = 40;
+    int GridHeightPx { get; set; }
+    int LastSkip { get; set; }
+
+    string SearchValue { get; set; } = "";
+
+    protected override void OnInitialized()
+    {
+        var GridToolBarHeightPx = 0;
+        var GridColumnHeaderHeightPx = 37;
+
+        GridHeightPx = PageSize * GridRowHeight + GridToolBarHeightPx + GridColumnHeaderHeightPx;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        await GridSetSkip(Grid, 0);
+    }
+
+    public static async Task GridSetSkip(TelerikGrid<Row> grid, int skip)
+    {
+        if (grid == null)
+            return;
+
+        var gridState = grid.GetState();
+        gridState.Skip = skip;
+        await grid.SetState(gridState);
+    }
+
+    public async Task ResetSearchValueAndSetGridSkip32()
+    {
+        SearchValue = "";
+
+        await GridSetSkip(Grid, 32);
+    }
+
+    public async Task SearchClicked()
+    {
+        await SearchTextBoxValueChanged("Baus");
+    }
+
+    public async Task SearchTextBoxValueChanged(string searchValue)
+    {
+        SearchValue = searchValue;
+
+        await GridSetSkip(Grid, 0);
+    }
+
+    protected async Task ReadGridItems(GridReadEventArgs args)
+    {
+        var skip = args.Request.Skip;
+        var pageSize = args.Request.PageSize;
+
+        LastSkip = skip;
+
+        var httpClient = HttpClientFactory.CreateClient("MyHttpClient");
+        var response = await httpClient.GetAsync("api/values/get");
+
+        var responseContent = await response.Content.ReadAsStringAsync();
+
+        var result = Newtonsoft.Json.JsonConvert.DeserializeObject<GridData>(responseContent);
+
+        var query = result
+            .Rows
+            .AsQueryable()
+            .Where(r =>
+                r.Kurztext != null && r.Kurztext.ToUpper().Contains(SearchValue.ToUpper()) ||
+                r.Langtext != null && r.Langtext.ToUpper().Contains(SearchValue.ToUpper())
+            );
+
+        Items = query
+            .OrderBy(o => o.Ordnungszahl)
+            .Skip(skip)
+            .Take(pageSize)
+            .ToList();
+
+        TotalCount = query.Count();
+    }
+}
