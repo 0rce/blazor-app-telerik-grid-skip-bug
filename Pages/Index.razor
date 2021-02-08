@@ -5,9 +5,8 @@
 <p>
     <h4>Steps to reproduce skip bug</h4>
     <ul>
-        <li>Click <b>1. Search</b>, grid data is filtered to a total of 31 items</li>
-        <li>Click <b>2. Clear search and set grid skip 32</b>, filter is removed and <span class="text-danger">grid skips 32 items but sets skip to 21 immentiatlly afterwards (see Last Skip indication below) -> bug?</span></li>
-        <li>Click <b>2. Clear search and set grid skip 32</b> again, sets the skip value correctly</li>
+        <li>Click <b>1. Skip 690</b>, sets grid skip to 690 (out of 696 items)</li>
+        <li>Click <b>2. Skip 690</b>, sets grid skip to 690 again, but the data is not shown correctly</li>
     </ul>
 </p>
 
@@ -18,18 +17,14 @@
 </p>
 
 <p>
-    <TelerikButton OnClick="@SearchClicked">1. Search</TelerikButton>
-</p>
-
-<p>
-    <TelerikButton OnClick="@ResetSearchValueAndSetGridSkip32">2. Clear search and set grid skip 32</TelerikButton>
+    <TelerikButton OnClick="@SetGridSkip690">Skip 690</TelerikButton>
 </p>
 
 <p>
     <TelerikGrid Data=@Items Height="@string.Format("{0}px", GridHeightPx)" FilterMode="GridFilterMode.None" ScrollMode="@GridScrollMode.Virtual"
-                    Sortable="false" RowHeight="@GridRowHeight" PageSize=@PageSize OnRead=@ReadGridItems TotalCount=@TotalCount Groupable="false" Resizable="true"
-                    @ref="@Grid"
-                    Class="grid">
+                 Sortable="false" RowHeight="@GridRowHeight" PageSize=@PageSize OnRead=@ReadGridItems TotalCount=@TotalCount Groupable="false" Resizable="true"
+                 @ref="@Grid"
+                 Class="grid">
         <GridColumns>
             <GridColumn Field="@(nameof(Row.Ordnungszahl))" Title="Ordnungszahl" Width="150px" />
             <GridColumn Field="@(nameof(Row.Kurztext))" Title="Kurztext" />
@@ -65,6 +60,11 @@
         await GridSetSkip(Grid, 0);
     }
 
+    public async Task SetGridSkip690()
+    {
+        await GridSetSkip(Grid, 690);
+    }
+
     public static async Task GridSetSkip(TelerikGrid<Row> grid, int skip)
     {
         if (grid == null)
@@ -73,25 +73,6 @@
         var gridState = grid.GetState();
         gridState.Skip = skip;
         await grid.SetState(gridState);
-    }
-
-    public async Task ResetSearchValueAndSetGridSkip32()
-    {
-        SearchValue = "";
-
-        await GridSetSkip(Grid, 32);
-    }
-
-    public async Task SearchClicked()
-    {
-        await SearchTextBoxValueChanged("Baus");
-    }
-
-    public async Task SearchTextBoxValueChanged(string searchValue)
-    {
-        SearchValue = searchValue;
-
-        await GridSetSkip(Grid, 0);
     }
 
     protected async Task ReadGridItems(GridReadEventArgs args)
